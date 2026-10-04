@@ -1,0 +1,17 @@
+# Faqat LOKAL ishlab chiqarish uchun (bazaning o'zi). Production: docker-compose.prod.yml
+services:
+  db:
+    image: postgres:16
+    container_name: factory_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: factory_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:5432:5432"   # faqat shu kompyuterdan ulanish mumkin
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
