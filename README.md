@@ -44,6 +44,21 @@ cd frontend && npm install && npm run dev      # http://localhost:5173  (/api ->
 
 Testlar (SQLite'da, asosiy bazaga tegmaydi): `pip install -r requirements-dev.txt && pytest`
 
+## Kunlik hisobot (Excel) va o'tgan sana bilan kiritish
+
+- **Ishlab chiqarish** sahifasida: hisobot saqlangach "Excelda yuklab olish" oynasi chiqadi; shuningdek tepada "Kunlik hisobot (Excel)" tugmasi bor. API: `GET /reports/daily/excel?date=YYYY-MM-DD`.
+- Fayl 4 varaqdan iborat: ishlab chiqarish, xomashyo (kun boshi / kirim / sarf / kun oxiri), tayyor mahsulot, moliya (xarid, sotuv, xarajat, sof natija). Jami va qoldiqlar formula bilan yoziladi.
+- Barcha kiritish formalarida (ishlab chiqarish, kirim, sotuv, xarajat, ombor) sana tanlanadi; "Bugun" / "Kecha" tugmalari bor. O'tgan sana bilan kiritilgan yozuv o'z kunining hisobotiga tushadi.
+- Ombor sahifasida "Qo'lda kirim / chiqim" (qoldig'i yo'q narsaga ham) va harakatlar jurnalida sana filtri bor.
+
+## Telefonga ilova sifatida o'rnatish (PWA)
+
+Sayt HTTPS bilan ochilsa (domen kerak, `SITE_ADDRESS`) telefonga ilova bo'lib o'rnatiladi:
+- **Android (Chrome):** menyu (⋮) → "Ilovani o'rnatish" / "Add to Home screen".
+- **iPhone (Safari):** Ulashish tugmasi → "Add to Home Screen".
+
+Ilova alohida oynada, ikonka bilan ochiladi. iPhone'da Excel hisobot tugmasi "Ulashish" oynasini ochadi (Fayllarga saqlash, Telegram, Excel), Android va kompyuterda fayl to'g'ridan-to'g'ri yuklanadi. Ma'lumotlar doim serverdan olinadi (keshlanmaydi), internet bo'lmasa ilova ochiladi, lekin ma'lumot ko'rinmaydi. HTTP (IP orqali) da o'rnatish tugmasi chiqmaydi, faqat oddiy sayt sifatida ochiladi.
+
 ## Production: serverga joylashtirish (Docker)
 
 ```

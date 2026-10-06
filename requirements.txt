@@ -8,3 +8,4 @@ pydantic>=2.5
 PyJWT>=2.8
 tzdata
 psycopg[binary]
+XlsxWriter>=3.1

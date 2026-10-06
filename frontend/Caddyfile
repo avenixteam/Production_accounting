@@ -1,0 +1,26 @@
+# SITE_ADDRESS bo'sh bo'lsa :80 (IP orqali, HTTP). Domen yozilsa (masalan zavod.example.uz)
+# Caddy HTTPS sertifikatni o'zi oladi va yangilab turadi.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html not path /assets/*
+		header @html Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
