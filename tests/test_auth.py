@@ -65,3 +65,24 @@ def test_change_password(secured):
     assert ok.status_code == 200
     assert login(secured, "worker").status_code == 401
     assert login(secured, "worker", "yangiparol1").status_code == 200
+
+
+def test_admin_can_delete_users_including_admins(secured):
+    admin, staff = hdr(secured, "boss"), hdr(secured, "worker")
+    body = {"username": "boshqa_admin", "password": "parol12345", "role": "admin"}
+    other = secured.post("/auth/users", json=body, headers=admin).json()
+    other_token = {"Authorization": f"Bearer {login(secured, 'boshqa_admin', 'parol12345').json()['access_token']}"}
+    users = {u["username"]: u["id"] for u in secured.get("/auth/users", headers=admin).json()}
+
+    # xodim o'chira olmaydi
+    assert secured.delete(f"/auth/users/{other['id']}", headers=staff).status_code == 403
+    # o'zini o'chirib bo'lmaydi
+    assert secured.delete(f"/auth/users/{users['boss']}", headers=admin).status_code == 400
+    # boshqa adminni o'chirish mumkin; eski tokeni va logini darrov ishlamaydi
+    assert secured.delete(f"/auth/users/{other['id']}", headers=admin).status_code == 200
+    assert secured.get("/auth/me", headers=other_token).status_code == 401
+    assert login(secured, "boshqa_admin", "parol12345").status_code == 401
+    # xodimni ham o'chirish mumkin, bo'lmagan foydalanuvchi 404
+    assert secured.delete(f"/auth/users/{users['worker']}", headers=admin).status_code == 200
+    assert secured.delete(f"/auth/users/{users['worker']}", headers=admin).status_code == 404
+    assert [u["username"] for u in secured.get("/auth/users", headers=admin).json()] == ["boss"]

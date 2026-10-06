@@ -44,26 +44,57 @@ export default function Users() {
     if (pw) update(u, { password: pw }, 'Parol yangilandi');
   };
 
+  const remove = async (u) => {
+    const role = u.role === 'admin' ? 'Admin' : 'Xodim';
+    if (!window.confirm(`${role} "${u.username}" butunlay o'chirilsinmi? Bu qaytarilmaydi.`)) return;
+    try {
+      await API.delete(`/auth/users/${u.id}`);
+      toast.success("Foydalanuvchi o'chirildi");
+      reload();
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
   const columns = [
-    { key: 'username', header: 'Login' },
-    { key: 'full_name', header: 'Ism' },
-    { key: 'role', header: 'Rol', render: (u) => <Badge tone={u.role === 'admin' ? 'blue' : 'gray'}>{u.role === 'admin' ? 'Admin' : 'Xodim'}</Badge> },
-    { key: 'active', header: 'Holat', render: (u) => <Badge tone={u.active ? 'green' : 'red'}>{u.active ? 'Faol' : 'Bloklangan'}</Badge> },
+    {
+      key: 'username',
+      header: 'Login',
+      render: (u) => (
+        <>
+          <b>{u.username}</b>
+          {u.full_name && <div className="muted" style={{ fontSize: 12 }}>{u.full_name}</div>}
+        </>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'Holat',
+      render: (u) => (
+        <div className="stack" style={{ gap: 4, alignItems: 'flex-start' }}>
+          <Badge tone={u.role === 'admin' ? 'blue' : 'gray'}>{u.role === 'admin' ? 'Admin' : 'Xodim'}</Badge>
+          <Badge tone={u.active ? 'green' : 'red'}>{u.active ? 'Faol' : 'Bloklangan'}</Badge>
+        </div>
+      ),
+    },
     {
       key: 'actions',
       header: '',
       align: 'right',
       render: (u) => (
-        <div className="row gap" style={{ justifyContent: 'flex-end' }}>
+        <div className="stack" style={{ gap: 6, alignItems: 'stretch', minWidth: 96, marginLeft: 'auto', width: 'max-content' }}>
           <Button variant="secondary" size="sm" onClick={() => resetPassword(u)}>Parol</Button>
           {u.id !== me?.id && (
-            <Button
-              variant={u.active ? 'danger' : 'secondary'}
-              size="sm"
-              onClick={() => update(u, { active: !u.active }, u.active ? 'Bloklandi' : 'Faollashtirildi')}
-            >
-              {u.active ? 'Bloklash' : 'Faollashtirish'}
-            </Button>
+            <>
+              <Button
+                variant={u.active ? 'danger' : 'secondary'}
+                size="sm"
+                onClick={() => update(u, { active: !u.active }, u.active ? 'Bloklandi' : 'Faollashtirildi')}
+              >
+                {u.active ? 'Bloklash' : 'Faollashtirish'}
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => remove(u)}>O'chirish</Button>
+            </>
           )}
         </div>
       ),
@@ -74,7 +105,7 @@ export default function Users() {
     <>
       <PageHeader
         title="Foydalanuvchilar"
-        subtitle="Admin hamma narsani qila oladi; xodim hujjatlarni bekor qila olmaydi"
+        subtitle="Admin hamma narsani qila oladi; xodim hujjatlarni bekor qila olmaydi. O'chirilgan foydalanuvchi qayta tiklanmaydi"
         actions={<Button onClick={() => setForm({ ...EMPTY })}>+ Foydalanuvchi</Button>}
       />
       {error && <ErrorBox message={error} />}

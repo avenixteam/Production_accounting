@@ -112,3 +112,17 @@ def update_user(user_id: int, payload: UserUpdate, admin=Depends(require_admin),
     db.commit()
     db.refresh(u)
     return _out(u)
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, admin=Depends(require_admin), db: Session = Depends(get_db)):
+    """Foydalanuvchini (admin yoki xodim) butunlay o'chiradi. O'zini o'chirib bo'lmaydi,
+    shuning uchun tizimda kamida bitta admin (so'rov yuborayotgan) doim qoladi."""
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "Foydalanuvchi topilmadi")
+    if u.id == admin.id:
+        raise HTTPException(400, "O'zingizni o'chirib bo'lmaydi")
+    db.delete(u)
+    db.commit()
+    return {"message": "Foydalanuvchi o'chirildi"}
