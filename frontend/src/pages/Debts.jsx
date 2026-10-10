@@ -9,42 +9,47 @@ export default function Debts() {
   const [saleId, setSaleId] = useState(null);
 
   const total = (data || []).reduce((s, d) => s + d.debt, 0);
-  const overdue = (data || []).reduce((s, d) => s + d.overdue, 0);
 
   return (
     <>
-      <PageHeader title="Qarzdorlik" subtitle="Muddatli to'lov bo'yicha mijozlar qarzi" />
+      <PageHeader title="Qarzdorlik" subtitle="Kimda qancha qarz bor: hamma qarzdorlar va ularning sotuvlari" />
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <StatCard label="Jami qarz" value={fmtMoney(total)} tone="amber" hint={`${data?.length || 0} ta qarzdor mijoz`} />
-        <StatCard label="Muddati o'tgan" value={fmtMoney(overdue)} tone={overdue > 0 ? 'red' : 'green'} />
+        <StatCard label="Jami qarz" value={fmtMoney(total)} tone={total > 0 ? 'amber' : 'green'} hint={`${data?.length || 0} ta qarzdor`} />
       </div>
-      <Card flush>
-        <ErrorBox message={error} />
-        {loading ? <Spinner /> : (
-          <Table
-            rows={data}
-            rowKey="customer_id"
-            empty="Qarzdor mijozlar yo'q 🎉"
-            columns={[
-              { key: 'customer_name', header: 'Mijoz', render: (d) => <b>{d.customer_name}</b> },
-              { key: 'phone', header: 'Telefon' },
-              { key: 'debt', header: 'Qarz', align: 'right', render: (d) => fmtMoney(d.debt) },
-              { key: 'overdue', header: "Muddati o'tgan", align: 'right', render: (d) => (d.overdue > 0 ? <span className="neg">{fmtMoney(d.overdue)}</span> : '—') },
-              { key: 'next_due_date', header: 'Eng yaqin muddat', render: (d) => fmtDate(d.next_due_date) },
-              {
-                key: 'sales', header: 'Sotuvlar',
-                render: (d) => (
-                  <div className="row gap wrap">
-                    {d.sale_ids.map((id) => (
-                      <Button key={id} size="sm" variant="secondary" onClick={() => setSaleId(id)}>#{id}</Button>
-                    ))}
-                  </div>
-                ),
-              },
-            ]}
-          />
-        )}
-      </Card>
+      <ErrorBox message={error} />
+      {loading ? <Spinner /> : !data?.length ? (
+        <Card><p className="muted">Qarzdorlar yo'q 🎉</p></Card>
+      ) : (
+        data.map((d) => (
+          <Card
+            key={d.customer_id}
+            flush
+            className="mt"
+            title={`${d.customer_name}${d.phone ? ` · ${d.phone}` : ''}`}
+            actions={<b className="neg">{fmtMoney(d.debt)}</b>}
+          >
+            <Table
+              rows={d.sales}
+              columns={[
+                {
+                  key: 'id', header: 'Sotuv',
+                  render: (s) => (
+                    <>
+                      <b>#{s.id}</b> · {fmtDate(s.date)}
+                      <div className="muted" style={{ fontSize: 12 }}>Summa {fmtMoney(s.total)}, to'langan {fmtMoney(s.paid)}</div>
+                    </>
+                  ),
+                },
+                { key: 'debt', header: 'Qarz', align: 'right', render: (s) => <b className="neg">{fmtMoney(s.debt)}</b> },
+                {
+                  key: 'a', header: '', align: 'right',
+                  render: (s) => <Button size="sm" variant="success" onClick={() => setSaleId(s.id)}>To'lov</Button>,
+                },
+              ]}
+            />
+          </Card>
+        ))
+      )}
       {saleId && <SaleDetailModal saleId={saleId} onClose={() => setSaleId(null)} onChanged={reload} />}
     </>
   );

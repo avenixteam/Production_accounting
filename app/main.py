@@ -9,14 +9,14 @@ from app import models  # noqa: F401  (barcha modellar ro'yxatdan o'tadi)
 from app.database import engine
 from app.deps import current_user
 from app.routers import (
-    auth, customers, expenses, inventory, machines, partners, production,
-    products, raw_materials, reports, sales,
+    auth, customers, expenses, machines, partners, production,
+    products, raw_materials, receipts, reports, sales,
 )
 
 app = FastAPI(
     title="Factory Production Accounting API",
     version="1.0.0",
-    description="Ishlab chiqarish zavodi uchun hisob-kitob tizimi: xomashyo, ishlab chiqarish, ombor, sotuv, qarzdorlik, xarajatlar.",
+    description="Ishlab chiqarish zavodi uchun hisob-kitob tizimi: xomashyo kirimi, ishlab chiqarish, sotuv, qarzdorlik, xarajatlar, hisobotlar.",
     root_path=os.getenv("ROOT_PATH", ""),  # Caddy orqasida "/api"
 )
 
@@ -36,7 +36,7 @@ app.include_router(auth.router)  # /auth/login ochiq, qolganlari ichida tekshiri
 
 for r in (
     partners.router, raw_materials.router, products.router, machines.router,
-    customers.router, inventory.router, production.router, sales.router,
+    customers.router, receipts.router, production.router, sales.router,
     expenses.router, reports.router,
 ):
     app.include_router(r, dependencies=[Depends(current_user)])  # hammasi login talab qiladi

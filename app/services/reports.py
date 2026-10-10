@@ -8,14 +8,16 @@ from sqlalchemy.orm import Session
 from app.models.customer import Customer
 from app.models.expense import Expense
 from app.models.partner import Partner
-from app.models.payment_schedule import PaymentSchedule
 from app.models.product import Product
 from app.models.production_item import ProductionItem
 from app.models.production_report import ProductionReport
 from app.models.raw_material_receipt import RawMaterialReceipt
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.models.sale_payment import SalePayment
 from app.utils import D, today as _today
+
+ZERO = Decimal("0")
 
 
 def month_range(today: Date | None = None) -> tuple[Date, Date]:
@@ -28,9 +30,62 @@ def _daterange(a: Date, b: Date):
         yield a + timedelta(days=n)
 
 
-def summary(db: Session, date_from: Date, date_to: Date) -> dict:
-    today = _today()
+def _months(a: Date, b: Date) -> list[str]:
+    """a dan b gacha bo'lgan oylar: ['2026-01', '2026-02', ...]"""
+    out, y, m = [], a.year, a.month
+    while (y, m) <= (b.year, b.month):
+        out.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
 
+
+def _sum_by_day(db: Session, value, date_col, date_from: Date, date_to: Date) -> dict:
+    """{sana: yig'indi} - kunlar kesimida."""
+    result: dict = defaultdict(Decimal)
+    for d, v in db.execute(
+        select(date_col, func.sum(value)).where(date_col.between(date_from, date_to)).group_by(date_col)
+    ):
+        result[d] = D(v)
+    return result
+
+
+def debts(db: Session) -> list[dict]:
+    """Qarzi bor mijozlar: har birining umumiy qarzi va qaysi sotuvlardan ekani."""
+    paid = (
+        select(SalePayment.sale_id.label("sale_id"), func.sum(SalePayment.amount).label("paid"))
+        .group_by(SalePayment.sale_id)
+        .subquery()
+    )
+    paid_col = func.coalesce(paid.c.paid, 0)
+    rows = db.execute(
+        select(Customer.id, Customer.name, Customer.phone, Sale.id, Sale.date, Sale.total_amount, paid_col)
+        .join(Sale, Sale.customer_id == Customer.id)
+        .outerjoin(paid, paid.c.sale_id == Sale.id)
+        .where(Sale.total_amount - paid_col > 0)
+        .order_by(Sale.date, Sale.id)
+    ).all()
+
+    result: dict[int, dict] = {}
+    for cid, cname, phone, sale_id, sale_date, total, paid_amount in rows:
+        debt = D(total) - D(paid_amount)
+        c = result.setdefault(cid, {
+            "customer_id": cid, "customer_name": cname, "phone": phone,
+            "debt": ZERO, "oldest_date": sale_date, "sales": [],
+        })
+        c["debt"] += debt
+        c["sales"].append({
+            "id": sale_id, "date": sale_date,
+            "total": float(total), "paid": float(paid_amount), "debt": float(debt),
+        })
+
+    out = []
+    for c in result.values():
+        c["debt"] = float(c["debt"])
+        out.append(c)
+    return sorted(out, key=lambda x: -x["debt"])
+
+
+def summary(db: Session, date_from: Date, date_to: Date) -> dict:
     production_total = D(db.scalar(
         select(func.coalesce(func.sum(ProductionItem.quantity), 0))
         .join(ProductionReport, ProductionReport.id == ProductionItem.production_id)
@@ -40,6 +95,9 @@ def summary(db: Session, date_from: Date, date_to: Date) -> dict:
         select(func.coalesce(func.sum(Sale.total_amount), 0), func.count(Sale.id))
         .where(Sale.date.between(date_from, date_to))
     ).one()
+    payments_total = D(db.scalar(
+        select(func.coalesce(func.sum(SalePayment.amount), 0)).where(SalePayment.date.between(date_from, date_to))
+    ))
     expenses_total = D(db.scalar(
         select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.date.between(date_from, date_to))
     ))
@@ -49,40 +107,44 @@ def summary(db: Session, date_from: Date, date_to: Date) -> dict:
     ))
 
     # Qarzdorlik - butun vaqt bo'yicha (davrga bog'liq emas)
-    unpaid = PaymentSchedule.amount - PaymentSchedule.paid_amount
-    receivable = D(db.scalar(select(func.coalesce(func.sum(unpaid), 0)).where(PaymentSchedule.paid.is_(False))))
-    overdue = D(db.scalar(
-        select(func.coalesce(func.sum(unpaid), 0))
-        .where(PaymentSchedule.paid.is_(False), PaymentSchedule.due_date < today)
-    ))
+    debtors = debts(db)
+    receivable = sum((D(c["debt"]) for c in debtors), ZERO)
 
-    # Kunlik qatorlar
-    prod_by_day = defaultdict(Decimal)
+    prod_by_day: dict = defaultdict(Decimal)
     for d, q in db.execute(
         select(ProductionReport.date, func.sum(ProductionItem.quantity))
         .join(ProductionItem, ProductionItem.production_id == ProductionReport.id)
         .where(ProductionReport.date.between(date_from, date_to)).group_by(ProductionReport.date)
     ):
         prod_by_day[d] = D(q)
-    sales_by_day = defaultdict(Decimal)
-    for d, q in db.execute(
-        select(Sale.date, func.sum(Sale.total_amount)).where(Sale.date.between(date_from, date_to)).group_by(Sale.date)
-    ):
-        sales_by_day[d] = D(q)
-    exp_by_day = defaultdict(Decimal)
-    for d, q in db.execute(
-        select(Expense.date, func.sum(Expense.amount)).where(Expense.date.between(date_from, date_to)).group_by(Expense.date)
-    ):
-        exp_by_day[d] = D(q)
+    sales_by_day = _sum_by_day(db, Sale.total_amount, Sale.date, date_from, date_to)
+    pay_by_day = _sum_by_day(db, SalePayment.amount, SalePayment.date, date_from, date_to)
+    exp_by_day = _sum_by_day(db, Expense.amount, Expense.date, date_from, date_to)
+    buy_by_day = _sum_by_day(
+        db, RawMaterialReceipt.quantity * RawMaterialReceipt.unit_price, RawMaterialReceipt.date, date_from, date_to
+    )
 
     daily = [
         {
             "date": d.isoformat(),
             "production": float(prod_by_day[d]),
             "sales": float(sales_by_day[d]),
+            "payments": float(pay_by_day[d]),
             "expenses": float(exp_by_day[d]),
         }
         for d in _daterange(date_from, date_to)
+    ]
+
+    monthly = {m: {"month": m, "production": ZERO, "sales": ZERO, "payments": ZERO,
+                   "expenses": ZERO, "purchases": ZERO} for m in _months(date_from, date_to)}
+    for series, key in ((prod_by_day, "production"), (sales_by_day, "sales"), (pay_by_day, "payments"),
+                        (exp_by_day, "expenses"), (buy_by_day, "purchases")):
+        for d, v in series.items():
+            monthly[d.strftime("%Y-%m")][key] += v
+    monthly_rows = [
+        {**{k: (float(v) if k != "month" else v) for k, v in row.items()},
+         "net": float(row["sales"] - row["expenses"] - row["purchases"])}
+        for row in monthly.values()
     ]
 
     top_products = [
@@ -98,20 +160,15 @@ def summary(db: Session, date_from: Date, date_to: Date) -> dict:
         )
     ]
 
-    by_partner = defaultdict(lambda: {"production": 0.0, "revenue": 0.0})
     names = {p.id: p.name for p in db.scalars(select(Partner))}
-    for pid, q in db.execute(
-        select(ProductionItem.partner_id, func.sum(ProductionItem.quantity))
-        .join(ProductionReport, ProductionReport.id == ProductionItem.production_id)
-        .where(ProductionReport.date.between(date_from, date_to)).group_by(ProductionItem.partner_id)
-    ):
-        by_partner[pid]["production"] = float(q)
-    for pid, r in db.execute(
-        select(SaleItem.partner_id, func.sum(SaleItem.total_price))
-        .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.date.between(date_from, date_to)).group_by(SaleItem.partner_id)
-    ):
-        by_partner[pid]["revenue"] = float(r)
+    by_partner = [
+        {"partner_id": pid, "partner_name": names.get(pid, "?"), "production": float(q)}
+        for pid, q in db.execute(
+            select(ProductionItem.partner_id, func.sum(ProductionItem.quantity))
+            .join(ProductionReport, ProductionReport.id == ProductionItem.production_id)
+            .where(ProductionReport.date.between(date_from, date_to)).group_by(ProductionItem.partner_id)
+        )
+    ]
 
     expense_by_category = [
         {"category": c, "amount": float(a)}
@@ -128,45 +185,15 @@ def summary(db: Session, date_from: Date, date_to: Date) -> dict:
         "production_total": float(production_total),
         "sales_total": float(sales_total),
         "sales_count": sales_count,
+        "payments_total": float(payments_total),
         "expenses_total": float(expenses_total),
         "purchases_total": float(purchases_total),
         "net_result": float(sales_total - expenses_total - purchases_total),
         "receivable_total": float(receivable),
-        "overdue_total": float(overdue),
+        "debtors_count": len(debtors),
         "daily": daily,
+        "monthly": monthly_rows,
         "top_products": top_products,
-        "by_partner": [{"partner_id": k, "partner_name": names.get(k, "?"), **v} for k, v in by_partner.items()],
+        "by_partner": by_partner,
         "expense_by_category": expense_by_category,
     }
-
-
-def debts(db: Session) -> list[dict]:
-    """Mijozlar kesimida umumiy qarz, muddati o'tgan summa va eng yaqin to'lov sanasi."""
-    today = _today()
-    rows = db.execute(
-        select(Customer.id, Customer.name, Customer.phone, Sale.id, PaymentSchedule)
-        .join(Sale, Sale.customer_id == Customer.id)
-        .join(PaymentSchedule, PaymentSchedule.sale_id == Sale.id)
-        .where(PaymentSchedule.paid.is_(False))
-        .order_by(PaymentSchedule.due_date)
-    ).all()
-
-    result: dict[int, dict] = {}
-    for cid, cname, phone, sale_id, sched in rows:
-        c = result.setdefault(cid, {
-            "customer_id": cid, "customer_name": cname, "phone": phone,
-            "debt": 0.0, "overdue": 0.0, "next_due_date": None, "sale_ids": set(),
-        })
-        remaining = float(D(sched.amount) - D(sched.paid_amount))
-        c["debt"] += remaining
-        c["sale_ids"].add(sale_id)
-        if sched.due_date < today:
-            c["overdue"] += remaining
-        if c["next_due_date"] is None or sched.due_date < c["next_due_date"]:
-            c["next_due_date"] = sched.due_date
-
-    out = []
-    for c in result.values():
-        c["sale_ids"] = sorted(c["sale_ids"])
-        out.append(c)
-    return sorted(out, key=lambda x: (-x["overdue"], -x["debt"]))

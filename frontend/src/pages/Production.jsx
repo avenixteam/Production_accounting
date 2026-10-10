@@ -1,59 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import API, { errMsg } from '../api';
 import { useToast } from '../components/Toast.jsx';
 import DailyReportModal from '../components/DailyReport.jsx';
-import { Badge, Button, Card, DateField, DateRange, ErrorBox, Field, Modal, PageHeader, Select, Spinner, Table } from '../components/ui.jsx';
+import { Button, Card, DateField, DateRange, ErrorBox, Field, Modal, PageHeader, Select, Spinner, Table } from '../components/ui.jsx';
 import { useFetch } from '../hooks/useFetch';
-import { fmtDate, fmtNum, monthStart, rmLabel, today, widenRange } from '../utils';
+import { fmtDate, fmtNum, monthStart, today, widenRange } from '../utils';
 
 const emptyLine = () => ({ product_id: '', partner_id: '', quantity: '' });
-
-function MaterialsPreview({ lines }) {
-  const [state, setState] = useState({ loading: false, data: null, error: null });
-  const valid = lines
-    .filter((l) => l.product_id && l.partner_id && Number(l.quantity) > 0)
-    .map((l) => ({ product_id: Number(l.product_id), partner_id: Number(l.partner_id), quantity: Number(l.quantity) }));
-  const key = JSON.stringify(valid);
-
-  useEffect(() => {
-    const items = JSON.parse(key);
-    if (!items.length) return undefined;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      setState((s) => ({ ...s, loading: true }));
-      API.post('/production/preview', { items })
-        .then((r) => !cancelled && setState({ loading: false, data: r.data, error: null }))
-        .catch((e) => !cancelled && setState({ loading: false, data: null, error: errMsg(e) }));
-    }, 350);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [key]);
-
-  if (!valid.length) return <p className="muted" style={{ marginTop: 14 }}>Mahsulot, hamkor va miqdorni kiriting — kerakli xomashyo avtomatik hisoblanadi.</p>;
-  if (state.error) return <div className="alert error" style={{ marginTop: 14 }}>{state.error}</div>;
-  if (!state.data) return <Spinner />;
-
-  return (
-    <div className="preview">
-      <div className="head">Kerakli xomashyo (retsept bo'yicha) {state.loading && '…'}</div>
-      <Table
-        rows={state.data.lines.map((l, i) => ({ ...l, id: i }))}
-        columns={[
-          { key: 'partner_name', header: 'Hamkor' },
-          { key: 'brand', header: 'Xomashyo', render: (r) => <b>{r.brand}</b> },
-          { key: 'required', header: 'Kerak', align: 'right', render: (r) => `${fmtNum(r.required)} ${r.unit}` },
-          { key: 'available', header: 'Mavjud', align: 'right', render: (r) => `${fmtNum(r.available)} ${r.unit}` },
-          {
-            key: 'ok', header: 'Holat',
-            render: (r) => (r.ok ? <Badge tone="green">Yetarli</Badge> : <Badge tone="red">{fmtNum(r.shortage)} {r.unit} yetmaydi</Badge>),
-          },
-        ]}
-      />
-    </div>
-  );
-}
 
 function ProductionForm({ onClose, onSaved }) {
   const toast = useToast();
@@ -62,7 +15,6 @@ function ProductionForm({ onClose, onSaved }) {
   const { data: partners } = useFetch('/partners');
   const [head, setHead] = useState({ date: today(), machine_id: '', note: '' });
   const [lines, setLines] = useState([emptyLine()]);
-  const [allowNegative, setAllowNegative] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const update = (i, patch) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -76,10 +28,9 @@ function ProductionForm({ onClose, onSaved }) {
         date: head.date,
         machine_id: Number(head.machine_id),
         note: head.note.trim() || null,
-        allow_negative: allowNegative,
         items: filled.map((l) => ({ product_id: Number(l.product_id), partner_id: Number(l.partner_id), quantity: Number(l.quantity) })),
       });
-      toast.success('Ishlab chiqarish hisoboti saqlandi, xomashyo ombordan yechildi');
+      toast.success('Ishlab chiqarish hisoboti saqlandi');
       onSaved(head.date);
     } catch (err) {
       toast.error(errMsg(err));
@@ -124,13 +75,6 @@ function ProductionForm({ onClose, onSaved }) {
           ))}
           <div><Button variant="secondary" size="sm" type="button" onClick={() => setLines([...lines, emptyLine()])}>+ Qator qo'shish</Button></div>
         </div>
-
-        <MaterialsPreview lines={lines} />
-
-        <label className="check" style={{ marginTop: 14 }}>
-          <input type="checkbox" checked={allowNegative} onChange={(e) => setAllowNegative(e.target.checked)} />
-          Xomashyo yetmasa ham saqlash (qoldiq minusga tushadi)
-        </label>
       </form>
     </Modal>
   );
@@ -143,18 +87,14 @@ function Details({ report, onClose }) {
         <dt>Stanok</dt><dd>{report.machine_name}</dd>
         <dt>Izoh</dt><dd>{report.note || '—'}</dd>
       </dl>
-      {report.items.map((it) => (
-        <div key={it.id} className="preview" style={{ marginTop: 10 }}>
-          <div className="head">{it.product_name} — {fmtNum(it.quantity)} {it.unit} ({it.partner_name})</div>
-          <Table
-            rows={it.materials.map((m, i) => ({ ...m, id: i }))}
-            columns={[
-              { key: 'brand', header: 'Sarflangan xomashyo', render: (m) => rmLabel(m) },
-              { key: 'quantity', header: 'Miqdor', align: 'right', render: (m) => `${fmtNum(m.quantity)} ${m.unit}` },
-            ]}
-          />
-        </div>
-      ))}
+      <Table
+        rows={report.items}
+        columns={[
+          { key: 'product_name', header: 'Mahsulot', render: (it) => <b>{it.product_name}</b> },
+          { key: 'partner_name', header: 'Hamkor' },
+          { key: 'quantity', header: 'Miqdor', align: 'right', render: (it) => `${fmtNum(it.quantity)} ${it.unit}` },
+        ]}
+      />
     </Modal>
   );
 }

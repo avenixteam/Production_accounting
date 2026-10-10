@@ -32,25 +32,15 @@ export const addMonths = (iso, n) => {
 };
 
 export const PAYMENT_TYPES = {
-  cash: 'Naqd',
-  card: 'Karta',
-  transfer: "O'tkazma",
-  installment: 'Muddatli',
+  full: "To'liq",
+  partial: 'Qisman',
+  credit: 'Nasiya',
 };
 
 export const SALE_STATUS = {
   paid: ["To'langan", 'green'],
   partial: ['Qisman', 'amber'],
-  unpaid: ["To'lanmagan", 'gray'],
-  overdue: ["Muddati o'tgan", 'red'],
-};
-
-export const MOVEMENT_TYPES = {
-  receipt: ['Kirim', 'green'],
-  usage: ['Ishlatildi', 'amber'],
-  production: ['Ishlab chiqarildi', 'green'],
-  sale: ['Sotildi', 'blue'],
-  adjustment: ['Tuzatish', 'gray'],
+  unpaid: ['Nasiya', 'red'],
 };
 
 export const rmLabel = (r) => (r?.name ? `${r.brand} — ${r.name}` : r?.brand || '');

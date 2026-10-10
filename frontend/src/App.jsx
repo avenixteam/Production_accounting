@@ -9,7 +9,7 @@ import Login from './pages/Login.jsx';
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Receipts = lazy(() => import('./pages/Receipts.jsx'));
 const Production = lazy(() => import('./pages/Production.jsx'));
-const Inventory = lazy(() => import('./pages/Inventory.jsx'));
+const Reports = lazy(() => import('./pages/Reports.jsx'));
 const Sales = lazy(() => import('./pages/Sales.jsx'));
 const Debts = lazy(() => import('./pages/Debts.jsx'));
 const Expenses = lazy(() => import('./pages/Expenses.jsx'));
@@ -31,10 +31,10 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="receipts" element={<Receipts />} />
         <Route path="production" element={<Production />} />
-        <Route path="inventory" element={<Inventory />} />
         <Route path="sales" element={<Sales />} />
         <Route path="debts" element={<Debts />} />
         <Route path="expenses" element={<Expenses />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="products" element={<Products />} />
         <Route path="raw-materials" element={<RawMaterials />} />
         <Route path="partners" element={<Partners />} />

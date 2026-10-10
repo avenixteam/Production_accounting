@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.production_report import ProductionReport
-from app.schemas.production import ProductionCreate, ProductionPreviewIn
+from app.schemas.production import ProductionCreate
 from app.services import production as svc
 
 router = APIRouter(prefix="/production", tags=["Production"])
@@ -27,13 +27,6 @@ def list_reports(
         stmt = stmt.where(ProductionReport.machine_id == machine_id)
     stmt = stmt.order_by(ProductionReport.date.desc(), ProductionReport.id.desc()).limit(min(limit, 1000))
     return [svc.serialize(r) for r in db.scalars(stmt).all()]
-
-
-@router.post("/preview")
-def preview(payload: ProductionPreviewIn, db: Session = Depends(get_db)):
-    """Saqlashdan oldin: qancha xomashyo kerak va yetarlimi."""
-    calc = svc.calculate_requirements(db, payload.items)
-    return {"ok": calc["ok"], "lines": calc["lines"]}
 
 
 @router.post("", status_code=201)

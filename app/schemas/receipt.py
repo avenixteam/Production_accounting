@@ -1,17 +1,16 @@
 from datetime import date as Date
 
 from pydantic import BaseModel, Field
+
 from app.utils import today
 
 
-class ProductionItemIn(BaseModel):
-    product_id: int
+class ReceiptCreate(BaseModel):
     partner_id: int
+    raw_material_id: int
     quantity: float = Field(gt=0)
-
-
-class ProductionCreate(BaseModel):
     date: Date = Field(default_factory=today)
-    machine_id: int
+    supplier_name: str | None = Field(default=None, max_length=150)
+    payment_type: str | None = Field(default=None, max_length=30)
+    unit_price: float | None = Field(default=None, ge=0)
     note: str | None = Field(default=None, max_length=500)
-    items: list[ProductionItemIn] = Field(min_length=1)

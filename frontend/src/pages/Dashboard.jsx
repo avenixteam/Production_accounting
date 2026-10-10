@@ -39,8 +39,8 @@ export default function Dashboard() {
             <StatCard label="Xarajatlar" value={fmtMoney(data.expenses_total)} tone="amber" />
             <StatCard label="Xomashyo xaridi" value={fmtMoney(data.purchases_total)} tone="amber" hint="narxi kiritilgan kirimlar" />
             <StatCard label="Sof natija" value={fmtMoney(data.net_result)} tone={data.net_result >= 0 ? 'green' : 'red'} hint="Sotuv − xarajat − xomashyo xaridi" />
-            <StatCard label="Mijozlar qarzi" value={fmtMoney(data.receivable_total)} tone="amber" hint="butun vaqt bo'yicha" />
-            <StatCard label="Muddati o'tgan qarz" value={fmtMoney(data.overdue_total)} tone={data.overdue_total > 0 ? 'red' : 'green'} />
+            <StatCard label="Tushgan to'lovlar" value={fmtMoney(data.payments_total)} tone="green" hint="shu davrda qabul qilingan" />
+            <StatCard label="Mijozlar qarzi" value={fmtMoney(data.receivable_total)} tone={data.receivable_total > 0 ? 'red' : 'green'} hint={`${data.debtors_count} ta qarzdor, butun vaqt bo'yicha`} />
           </div>
 
           <div className="grid cols-2 mt">
@@ -83,7 +83,7 @@ export default function Dashboard() {
                 ]}
               />
             </Card>
-            <Card title="Hamkorlar kesimida" flush>
+            <Card title="Hamkorlar bo'yicha ishlab chiqarish" flush>
               <Table
                 rows={data.by_partner}
                 rowKey="partner_id"
@@ -91,7 +91,6 @@ export default function Dashboard() {
                 columns={[
                   { key: 'partner_name', header: 'Hamkor', render: (r) => <b>{r.partner_name}</b> },
                   { key: 'production', header: 'Ishlab chiqarilgan', align: 'right', render: (r) => fmtNum(r.production) },
-                  { key: 'revenue', header: 'Tushum', align: 'right', render: (r) => fmtMoney(r.revenue) },
                 ]}
               />
             </Card>

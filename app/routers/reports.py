@@ -26,7 +26,7 @@ def summary(date_from: Date | None = None, date_to: Date | None = None, db: Sess
 
 @router.get("/daily/excel")
 def daily_excel(date: Date | None = None, db: Session = Depends(get_db)):
-    """Bir kunlik hisobot (.xlsx): ishlab chiqarish, ombor qoldig'i, kirim, sotuv, xarajat.
+    """Bir kunlik hisobot (.xlsx): ishlab chiqarish, xomashyo kirimi, sotuv, to'lovlar, xarajatlar.
 
     `date` berilmasa - bugun (Toshkent vaqti). O'tgan sana ham bo'ladi: o'sha kunga kiritilgan
     barcha yozuvlar (qaysi kuni kiritilganidan qat'i nazar) hisobotga tushadi.

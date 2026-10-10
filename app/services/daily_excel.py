@@ -2,20 +2,9 @@
 
 Bu modul ma'lumotlar bazasiga BOG'LIQ EMAS: `daily_report.collect()` tayyorlagan oddiy
 lug'atlarni oladi va .xlsx baytlarini qaytaradi (shu sababli uni alohida sinash oson).
+Yig'indilar FORMULA bilan yoziladi; hisoblangan qiymat ham saqlanadi (telefon ko'rinishi uchun).
 
-Yig'indilar va "kun oxiriga qoldiq" FORMULA bilan yoziladi (faylda biror son tuzatilsa, jami
-qayta hisoblanadi). Hisoblangan qiymat formula yoniga ham saqlanadi, shuning uchun telefon
-yoki Telegram ko'rinishida ham sonlar bo'sh chiqmaydi.
-
-Kutiladigan `data` tuzilmasi:
-    date          - hisobot sanasi (datetime.date)
-    generated_at  - fayl tuzilgan vaqt (datetime)
-    production    - services.production.serialize() natijalari ro'yxati
-    raw_rows      - xomashyo qoldiq qatorlari  [{partner_name, label, unit, opening, incoming, outgoing, adjustment}]
-    fp_rows       - tayyor mahsulot qoldiq qatorlari (kalitlar xuddi shunday)
-    receipts      - xomashyo kirimlari [{partner_name, brand, unit, quantity, unit_price, supplier_name, payment_type, note}]
-    sales         - services.sales.serialize() natijalari ro'yxati
-    expenses      - [{category, description, amount}]
+Kutiladigan `data`: date, generated_at, production, receipts, sales, payments, expenses.
 """
 from __future__ import annotations
 
@@ -29,17 +18,14 @@ FONT = "Arial"
 NAVY = "#1E3A5F"
 GRID = "#C9CFD8"
 SOFT = "#F3F5F9"
-RED = "#B91C1C"
-RED_BG = "#FEE2E2"
 MUTED = "#6B7280"
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-PAYMENT_LABELS = {
-    "cash": "Naqd",
-    "card": "Karta",
-    "transfer": "O'tkazma",
-    "installment": "Muddatli",
+STATUS_LABELS = {
+    "paid": "To'langan",
+    "partial": "Qisman",
+    "unpaid": "Nasiya",
 }
 
 ZERO = Decimal("0")
@@ -243,69 +229,7 @@ def _production_sheet(wb, st: _Styles, data: dict) -> None:
         row += 1
 
 
-# ---------------------------------------------------------------- 2-3-varaq: ombor qoldig'i
-def _stock_sheet(wb, st: _Styles, data: dict, *, sheet_name: str, title: str, rows: list[dict],
-                 item_header: str, in_header: str, out_header: str, empty_text: str) -> None:
-    ws = wb.add_worksheet(sheet_name)
-    _prepare(ws, [22, 34, 8, 16, 15, 16, 14, 17])
-    _title_block(ws, st, title, data, last_col=7)
-
-    head_row = 3
-    _write_headers(
-        ws, st, head_row,
-        ["Hamkor", item_header, "Birlik", "Kun boshiga qoldiq", in_header, out_header,
-         "Tuzatish (+/−)", "Kun oxiriga qoldiq"],
-        32,
-    )
-    ws.freeze_panes(head_row + 1, 0)
-
-    row = head_row + 1
-    if not rows:
-        ws.merge_range(row, 0, row, 7, empty_text, st.empty_note())
-        return
-
-    first = row
-    has_negative = False
-    for r in rows:
-        opening, inc, out, adj = _d(r["opening"]), _d(r["incoming"]), _d(r["outgoing"]), _d(r["adjustment"])
-        closing = opening + inc - out + adj
-        has_negative = has_negative or opening < 0 or closing < 0
-
-        ws.write_string(row, 0, r["partner_name"], st.text())
-        ws.write_string(row, 1, r["label"], st.text())
-        ws.write_string(row, 2, r["unit"], st.cell(align="center"))
-        ws.write_number(row, 3, _f(opening), st.number(opening))
-        ws.write_number(row, 4, _f(inc), st.number(inc))
-        ws.write_number(row, 5, _f(out), st.number(out))
-        ws.write_number(row, 6, _f(adj), st.number(adj))
-        formula = f"={_cell_ref(row, 3)}+{_cell_ref(row, 4)}-{_cell_ref(row, 5)}+{_cell_ref(row, 6)}"
-        ws.write_formula(row, 7, formula, st.number(closing, bold=True), _f(closing))
-        row += 1
-    last = row - 1
-
-    # Manfiy qoldiq - qizil
-    neg = wb.add_format({"font_color": RED, "bg_color": RED_BG, "bold": True})
-    for col in (3, 7):
-        ws.conditional_format(first, col, last, col, {"type": "cell", "criteria": "<", "value": 0, "format": neg})
-
-    row += 1
-    ws.merge_range(
-        row, 0, row, 7,
-        "Qoldiq = kun boshiga + kirim − chiqim ± tuzatish. Bu kungacha kiritilgan barcha harakatlar hisobga olingan.",
-        st.meta(text_wrap=True),
-    )
-    if has_negative:
-        row += 1
-        ws.merge_range(
-            row, 0, row, 7,
-            "Qizil katak — qoldiq manfiy. Odatda shu sanadan oldingi kirim yoki ishlab chiqarish "
-            "kiritilmagan (yoki sanasi noto'g'ri qo'yilgan) bo'ladi.",
-            st.fmt(font_color=RED, text_wrap=True),
-        )
-        ws.set_row(row, 28)
-
-
-# ---------------------------------------------------------------- 4-varaq: moliya
+# ---------------------------------------------------------------- 2-varaq: moliya
 def _section(ws, st, row: int, text: str) -> int:
     ws.merge_range(row, 0, row, 7, text, st.section())
     ws.set_row(row, 20)
@@ -315,14 +239,16 @@ def _section(ws, st, row: int, text: str) -> int:
 def _finance_sheet(wb, st: _Styles, data: dict) -> None:
     ws = wb.add_worksheet("Moliya")
     _prepare(ws, [10, 24, 22, 30, 12, 15, 17, 34])
-    _title_block(ws, st, "Kunlik moliya: xomashyo xaridi, sotuv va xarajatlar", data, last_col=7)
+    _title_block(ws, st, "Kunlik moliya: xomashyo kirimi, sotuv, to'lovlar va xarajatlar", data, last_col=7)
 
-    # Pul summalarida tiyin bor-yo'qligi: butun varaq uchun bir xil format (o'nlik nuqtalar tekis turadi)
+    # Pul summalarida tiyin bor-yo'qligi: butun varaq uchun bir xil format
     priced = [r for r in data["receipts"] if r.get("unit_price") is not None]
     frac = any(not _is_whole(r["unit_price"]) or not _is_whole(_d(r["quantity"]) * _d(r["unit_price"]))
                for r in priced)
     frac = frac or any(not _is_whole(it["unit_price"]) or not _is_whole(it["total_price"])
                        for s in data["sales"] for it in s["items"])
+    frac = frac or any(not _is_whole(p["amount"]) for p in data["payments"])
+    frac = frac or any(not _is_whole(s["debt"]) for s in data["sales"])
     frac = frac or any(not _is_whole(e["amount"]) for e in data["expenses"])
 
     def money(value, **kw):
@@ -331,6 +257,16 @@ def _finance_sheet(wb, st: _Styles, data: dict) -> None:
     def money_total(value):
         return st.total_number(value, money=True, decimals=frac)
 
+    def total_row(row, label, first, count, total):
+        """Jami qatori: SUM formulasi (ma'lumot bo'lmasa 0)."""
+        ws.merge_range(row, 0, row, 5, label, st.total_label())
+        if count:
+            ws.write_formula(row, 6, f"=SUM({xl_range(first, 6, first + count - 1, 6)})",
+                             money_total(total), float(total))
+        else:
+            ws.write_number(row, 6, 0, money_total(0))
+        ws.write_blank(row, 7, None, st.total_blank())
+
     row = 3
 
     # --- Xomashyo kirimi
@@ -338,8 +274,7 @@ def _finance_sheet(wb, st: _Styles, data: dict) -> None:
     _write_headers(ws, st, row, ["№", "Hamkor", "Xomashyo", "Yetkazib beruvchi", "Miqdor",
                                  "Narxi (so'm)", "Summa (so'm)", "To'lov turi / izoh"], 22)
     row += 1
-    rec_first = row
-    rec_total = ZERO
+    rec_first, rec_total = row, ZERO
     if not data["receipts"]:
         ws.merge_range(row, 0, row, 7, "Bu kunda xomashyo kirimi yo'q", st.empty_note())
         row += 1
@@ -362,22 +297,15 @@ def _finance_sheet(wb, st: _Styles, data: dict) -> None:
         ws.write_string(row, 7, extra, st.text())
         row += 1
     rec_total_row = row
-    ws.merge_range(row, 0, row, 5, "Jami xomashyo xaridi", st.total_label())
-    if data["receipts"]:
-        rng = xl_range(rec_first, 6, row - 1, 6)
-        ws.write_formula(row, 6, f"=SUM({rng})", money_total(rec_total), float(rec_total))
-    else:
-        ws.write_number(row, 6, 0, money_total(0))
-    ws.write_blank(row, 7, None, st.total_blank())
+    total_row(row, "Jami xomashyo xaridi", rec_first, len(data["receipts"]), rec_total)
     row += 2
 
     # --- Sotuvlar
     row = _section(ws, st, row, "Sotuvlar")
-    _write_headers(ws, st, row, ["Sotuv №", "Mijoz", "To'lov turi", "Mahsulot", "Miqdor",
+    _write_headers(ws, st, row, ["Sotuv №", "Mijoz", "To'lov holati", "Mahsulot", "Miqdor",
                                  "Narxi (so'm)", "Summa (so'm)", "Hamkor / izoh"], 22)
     row += 1
-    sale_first = row
-    sale_total = ZERO
+    sale_first, sale_total, sale_lines = row, ZERO, 0
     if not data["sales"]:
         ws.merge_range(row, 0, row, 7, "Bu kunda sotuv yo'q", st.empty_note())
         row += 1
@@ -385,42 +313,63 @@ def _finance_sheet(wb, st: _Styles, data: dict) -> None:
         for it in s["items"]:
             amount = _d(it["total_price"])
             sale_total += amount
+            sale_lines += 1
             ws.write_number(row, 0, s["id"], st.cell(align="center"))
             ws.write_string(row, 1, s.get("customer_name") or "", st.text())
-            ws.write_string(row, 2, PAYMENT_LABELS.get(s["payment_type"], s["payment_type"]), st.text())
+            ws.write_string(row, 2, STATUS_LABELS.get(s.get("status"), s.get("status") or ""), st.text())
             ws.write_string(row, 3, f"{it['product_name']} ({it['unit']})", st.text())
             ws.write_number(row, 4, _f(it["quantity"]), st.number(it["quantity"]))
             ws.write_number(row, 5, float(_round2(it["unit_price"])), money(it["unit_price"]))
             ws.write_formula(row, 6, f"=ROUND({_cell_ref(row, 4)}*{_cell_ref(row, 5)},2)",
                              money(amount), float(amount))
-            tail = it["partner_name"] + (f"; {s['note']}" if s.get("note") else "")
+            tail = "; ".join(x for x in (it.get("partner_name"), s.get("note")) if x)
             ws.write_string(row, 7, tail, st.text())
             row += 1
     sale_total_row = row
-    ws.merge_range(row, 0, row, 5, "Jami sotuv", st.total_label())
-    if data["sales"]:
-        rng = xl_range(sale_first, 6, row - 1, 6)
-        ws.write_formula(row, 6, f"=SUM({rng})", money_total(sale_total), float(sale_total))
-    else:
-        ws.write_number(row, 6, 0, money_total(0))
-    ws.write_blank(row, 7, None, st.total_blank())
+    total_row(row, "Jami sotuv", sale_first, sale_lines, sale_total)
     row += 2
 
-    # --- Xarajatlar
-    row = _section(ws, st, row, "Xarajatlar")
-    ws.write_string(row, 0, "№", st.head())
-    ws.write_string(row, 1, "Kategoriya", st.head())
+    # --- Shu kuni qabul qilingan to'lovlar (eski qarz bo'yicha ham)
+    row = _section(ws, st, row, "Shu kuni qabul qilingan to'lovlar")
+    ws.write_string(row, 0, "Sotuv №", st.head())
+    ws.write_string(row, 1, "Mijoz", st.head())
     ws.merge_range(row, 2, row, 5, "Izoh", st.head())
     ws.write_string(row, 6, "Summa (so'm)", st.head())
     ws.write_blank(row, 7, None, st.head())
     ws.set_row(row, 22)
     row += 1
-    exp_first = row
-    exp_total = ZERO
-    if not data["expenses"]:
+    pay_first, pay_total = row, ZERO
+    if not data["payments"]:
+        ws.merge_range(row, 0, row, 7, "Bu kunda to'lov qabul qilinmagan", st.empty_note())
+        row += 1
+    for p in data["payments"]:
+        amount = _d(p["amount"])
+        pay_total += amount
+        ws.write_number(row, 0, p["sale_id"], st.cell(align="center"))
+        ws.write_string(row, 1, p.get("customer_name") or "", st.text())
+        ws.merge_range(row, 2, row, 5, p.get("note") or "", st.text())
+        ws.write_number(row, 6, float(_round2(amount)), money(amount))
+        ws.write_blank(row, 7, None, st.cell())
+        row += 1
+    pay_total_row = row
+    total_row(row, "Jami qabul qilingan to'lov", pay_first, len(data["payments"]), pay_total)
+    row += 2
+
+    # --- Xarajatlar (kategoriya bo'yicha tartiblangan)
+    row = _section(ws, st, row, "Xarajatlar")
+    ws.write_string(row, 0, "№", st.head())
+    ws.write_string(row, 1, "Kategoriya", st.head())
+    ws.merge_range(row, 2, row, 5, "Nima uchun", st.head())
+    ws.write_string(row, 6, "Summa (so'm)", st.head())
+    ws.write_blank(row, 7, None, st.head())
+    ws.set_row(row, 22)
+    row += 1
+    expenses = sorted(data["expenses"], key=lambda e: (e["category"].lower(), e.get("id", 0)))
+    exp_first, exp_total = row, ZERO
+    if not expenses:
         ws.merge_range(row, 0, row, 7, "Bu kunda xarajat yo'q", st.empty_note())
         row += 1
-    for n, e in enumerate(data["expenses"], start=1):
+    for n, e in enumerate(expenses, start=1):
         amount = _d(e["amount"])
         exp_total += amount
         ws.write_number(row, 0, n, st.cell(align="center"))
@@ -430,34 +379,56 @@ def _finance_sheet(wb, st: _Styles, data: dict) -> None:
         ws.write_blank(row, 7, None, st.cell())
         row += 1
     exp_total_row = row
-    ws.merge_range(row, 0, row, 5, "Jami xarajat", st.total_label())
-    if data["expenses"]:
-        rng = xl_range(exp_first, 6, row - 1, 6)
-        ws.write_formula(row, 6, f"=SUM({rng})", money_total(exp_total), float(exp_total))
-    else:
-        ws.write_number(row, 6, 0, money_total(0))
-    ws.write_blank(row, 7, None, st.total_blank())
-    row += 2
+    total_row(row, "Jami xarajat", exp_first, len(expenses), exp_total)
+    row += 1
 
-    # --- Xulosa (dashboard bilan bir xil hisob: sotuv − xarajat − xomashyo xaridi)
+    if expenses:  # kategoriya bo'yicha jami (SUMPRODUCT: nomdagi '*' kabi belgilar xato moslashmasligi uchun)
+        row += 1
+        cat_rng = xl_range_abs(exp_first, 1, exp_first + len(expenses) - 1, 1)
+        amt_rng = xl_range_abs(exp_first, 6, exp_first + len(expenses) - 1, 6)
+        ws.write_string(row, 1, "Kategoriya bo'yicha jami", st.head())
+        ws.merge_range(row, 2, row, 5, "", st.head())
+        ws.write_string(row, 6, "Summa (so'm)", st.head())
+        row += 1
+        by_cat: dict[str, Decimal] = {}
+        for e in expenses:
+            by_cat[e["category"]] = by_cat.get(e["category"], ZERO) + _d(e["amount"])
+        for name, value in by_cat.items():
+            ws.write_string(row, 1, name, st.text())
+            ws.merge_range(row, 2, row, 5, "", st.cell())
+            ws.write_formula(
+                row, 6, f"=SUMPRODUCT(--({cat_rng}={_cell_ref(row, 1)}),{amt_rng})",
+                money(value), float(_round2(value)),
+            )
+            row += 1
+    row += 1
+
+    # --- Kun xulosasi (sof natija: sotuv − xarajat − xomashyo xaridi)
     row = _section(ws, st, row, "Kun xulosasi")
     net = sale_total - exp_total - rec_total
-    summary = [
-        ("Sotuv jami", f"={_cell_ref(sale_total_row, 6)}", sale_total, False),
-        ("Xarajatlar jami", f"={_cell_ref(exp_total_row, 6)}", exp_total, False),
-        ("Xomashyo xaridi jami", f"={_cell_ref(rec_total_row, 6)}", rec_total, False),
-    ]
-    for label, formula, value, bold in summary:
-        ws.merge_range(row, 0, row, 5, label, st.cell(bold=bold))
-        ws.write_formula(row, 6, formula, money(value, bold=bold), float(_round2(value)))
+    for label, ref, value in (
+        ("Sotuv jami", sale_total_row, sale_total),
+        ("Xarajatlar jami", exp_total_row, exp_total),
+        ("Xomashyo xaridi jami", rec_total_row, rec_total),
+    ):
+        ws.merge_range(row, 0, row, 5, label, st.cell())
+        ws.write_formula(row, 6, f"={_cell_ref(ref, 6)}", money(value), float(_round2(value)))
         row += 1
     s_ref, e_ref, r_ref = (_cell_ref(sale_total_row, 6), _cell_ref(exp_total_row, 6), _cell_ref(rec_total_row, 6))
     ws.merge_range(row, 0, row, 5, "Sof natija (sotuv − xarajat − xomashyo xaridi)", st.total_label())
     ws.write_formula(row, 6, f"={s_ref}-{e_ref}-{r_ref}", money_total(net), float(_round2(net)))
+    row += 2
+
+    day_debt = sum((_d(s["debt"]) for s in data["sales"]), ZERO)
+    ws.merge_range(row, 0, row, 5, "Shu kuni qabul qilingan to'lovlar (jami)", st.cell())
+    ws.write_formula(row, 6, f"={_cell_ref(pay_total_row, 6)}", money(pay_total), float(_round2(pay_total)))
+    row += 1
+    ws.merge_range(row, 0, row, 5, "Shu kungi sotuvlardan hozirgi qarz", st.cell())
+    ws.write_number(row, 6, float(_round2(day_debt)), money(day_debt))
     row += 1
     ws.merge_range(
         row, 0, row, 7,
-        "Muddatli sotuvlar to'liq summada hisoblangan (tushum emas, sotuv summasi). "
+        "Sof natija sotuv summasi bo'yicha hisoblanadi (nasiyaga berilgani ham kiradi). "
         "Narxi kiritilmagan kirimlar xarid summasiga kirmaydi.",
         st.meta(text_wrap=True),
     )
@@ -484,16 +455,6 @@ def build_workbook(data: dict) -> bytes:
     st = _Styles(wb)
 
     _production_sheet(wb, st, data)
-    _stock_sheet(
-        wb, st, data, sheet_name="Xomashyo", title="Xomashyo harakati va qoldig'i",
-        rows=data["raw_rows"], item_header="Xomashyo", in_header="Kirim",
-        out_header="Sarf (ishlab chiqarish)", empty_text="Bu kunda xomashyo harakati ham, qoldiq ham yo'q",
-    )
-    _stock_sheet(
-        wb, st, data, sheet_name="Tayyor mahsulot", title="Tayyor mahsulot harakati va qoldig'i",
-        rows=data["fp_rows"], item_header="Mahsulot", in_header="Ishlab chiqarildi",
-        out_header="Sotildi", empty_text="Bu kunda tayyor mahsulot harakati ham, qoldiq ham yo'q",
-    )
     _finance_sheet(wb, st, data)
 
     wb.close()

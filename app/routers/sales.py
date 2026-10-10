@@ -51,10 +51,10 @@ def get_sale(sale_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{sale_id}/payments")
 def add_payment(sale_id: int, payload: PaymentIn, db: Session = Depends(get_db)):
-    return svc.serialize(svc.pay(db, sale_id, payload.amount))
+    return svc.serialize(svc.add_payment(db, sale_id, payload.amount, payload.date, payload.note))
 
 
 @router.delete("/{sale_id}")
 def delete_sale(sale_id: int, db: Session = Depends(get_db)):
     svc.delete_sale(db, sale_id)
-    return {"message": "Sotuv bekor qilindi, mahsulot omborga qaytarildi"}
+    return {"message": "Sotuv bekor qilindi"}

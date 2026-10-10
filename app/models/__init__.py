@@ -1,4 +1,9 @@
-"""Barcha modellarni import qilish - Base.metadata to'liq bo'lishi uchun."""
+"""Barcha modellarni import qilish - Base.metadata to'liq bo'lishi uchun.
+
+Eslatma: RawMaterialMovement, FinishedProductMovement, MaterialUsage, ProductRecipe, PaymentSchedule
+ESKI (ombor va muddatli to'lov) jadvallari. Ular endi ishlatilmaydi, lekin eski bazadagi yozuvlar
+(tashqi kalitlar) bilan bog'liqligi uchun saqlanadi: shu sababli ma'lumot yo'qolmaydi.
+"""
 from app.models.partner import Partner  # noqa: F401
 from app.models.raw_material import RawMaterial  # noqa: F401
 from app.models.product import Product  # noqa: F401
@@ -15,5 +20,7 @@ from app.models.sale_item import SaleItem  # noqa: F401
 from app.models.finished_product_movement import FinishedProductMovement  # noqa: F401
 from app.models.payment_schedule import PaymentSchedule  # noqa: F401
 from app.models.expense import Expense  # noqa: F401
+from app.models.expense_category import ExpenseCategory  # noqa: F401
+from app.models.sale_payment import SalePayment  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models import indexes  # noqa: F401,E402  (indekslar Base.metadata ga qo'shiladi)

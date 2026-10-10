@@ -7,6 +7,7 @@ indeks eng muhim. `python init_db.py` bu indekslarni MAVJUD bazaga ham qo'shadi.
 from sqlalchemy import Index
 
 from app.models.expense import Expense
+from app.models.sale_payment import SalePayment
 from app.models.finished_product_movement import FinishedProductMovement as FPM
 from app.models.material_usage import MaterialUsage
 from app.models.payment_schedule import PaymentSchedule
@@ -34,6 +35,8 @@ Index("ix_sale_items_sale", SaleItem.sale_id)
 Index("ix_sale_items_partner", SaleItem.partner_id)
 Index("ix_sale_items_product", SaleItem.product_id)
 
+Index("ix_sale_payments_sale", SalePayment.sale_id)
+Index("ix_sale_payments_date", SalePayment.date)
 Index("ix_schedule_sale", PaymentSchedule.sale_id)
 Index("ix_schedule_open_due", PaymentSchedule.paid, PaymentSchedule.due_date)
 

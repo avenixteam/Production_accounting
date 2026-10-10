@@ -28,20 +28,3 @@ class ProductOut(ORMModel):
     price: float
     active: bool
     created_at: datetime
-
-
-class RecipeLineIn(BaseModel):
-    raw_material_id: int
-    quantity: float = Field(gt=0, description="1 birlik mahsulotga sarflanadigan miqdor")
-
-
-class RecipeSetIn(BaseModel):
-    items: list[RecipeLineIn]
-
-
-class RecipeLineOut(BaseModel):
-    raw_material_id: int
-    brand: str
-    name: str | None
-    unit: str
-    quantity: float

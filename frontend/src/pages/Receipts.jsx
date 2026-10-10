@@ -13,7 +13,7 @@ const empty = () => ({
 export default function Receipts() {
   const toast = useToast();
   const [filters, setFilters] = useState({ from: monthStart(), to: today(), partner_id: '', raw_material_id: '' });
-  const { data, loading, error, reload } = useFetch('/inventory/receipts', {
+  const { data, loading, error, reload } = useFetch('/receipts', {
     date_from: filters.from, date_to: filters.to, partner_id: filters.partner_id, raw_material_id: filters.raw_material_id,
   });
   const { data: partners } = useFetch('/partners');
@@ -29,7 +29,7 @@ export default function Receipts() {
     e.preventDefault();
     setSaving(true);
     try {
-      await API.post('/inventory/receipts', {
+      await API.post('/receipts', {
         partner_id: Number(form.partner_id),
         raw_material_id: Number(form.raw_material_id),
         quantity: Number(form.quantity),
@@ -53,7 +53,7 @@ export default function Receipts() {
   const remove = async (r) => {
     if (!window.confirm(`Kirim #${r.id} o'chirilsinmi? Ombor qoldig'i kamayadi.`)) return;
     try {
-      await API.delete(`/inventory/receipts/${r.id}`);
+      await API.delete(`/receipts/${r.id}`);
       toast.success("Kirim o'chirildi");
       reload();
     } catch (err) {

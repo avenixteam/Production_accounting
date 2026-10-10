@@ -44,6 +44,16 @@ cd frontend && npm install && npm run dev      # http://localhost:5173  (/api ->
 
 Testlar (SQLite'da, asosiy bazaga tegmaydi): `pip install -r requirements-dev.txt && pytest`
 
+## Soddalashtirilgan tizim (ombor yo'q)
+
+- **Ombor va retsept olib tashlangan.** Ishlab chiqarish hisoboti faqat qaysi stanokda, nima, kimning nomiga, qancha ishlab chiqarilganini yozadi.
+- **Xomashyo kirimi** alohida qoladi (hamkorga bog'liq).
+- **Xarajatlar:** avval "Kategoriyalar" orqali kategoriya yaratiladi (masalan Oshxona), keyin xarajat shu kategoriya ichiga yoziladi.
+- **Sotuvlar:** to'lov turi *To'liq* (to'langan), *Qisman* (hozir qancha berdi, qolgani qarz), *Nasiya* (hali to'lamagan). Qarz sahifasidan yoki sotuv ichidan yana to'lov qabul qilinsa, qarzdan ayriladi.
+- **Qarzdorlik:** hamma qarzdorlar va ularning sotuvlari bir joyda.
+- **Hisobotlar:** oylik, 3 oylik, 6 oylik va yillik.
+- **Eski bazani yangilash:** `python init_db.py` (yoki Docker qayta ishga tushganda) eski sotuvlarni yangi to'lov turlariga o'tkazadi va xarajat nomlarini kategoriyaga aylantiradi. To'lovlar yo'qolmaydi.
+
 ## Kunlik hisobot (Excel) va o'tgan sana bilan kiritish
 
 - **Ishlab chiqarish** sahifasida: hisobot saqlangach "Excelda yuklab olish" oynasi chiqadi; shuningdek tepada "Kunlik hisobot (Excel)" tugmasi bor. API: `GET /reports/daily/excel?date=YYYY-MM-DD`.

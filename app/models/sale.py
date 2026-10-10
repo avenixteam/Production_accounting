@@ -51,6 +51,12 @@ class Sale(Base):
         cascade="all, delete-orphan",
         order_by="SaleItem.id"
     )
+    payments = relationship(
+        "SalePayment",
+        cascade="all, delete-orphan",
+        order_by="SalePayment.date, SalePayment.id"
+    )
+    # Eski muddatli to'lov jadvali: endi ishlatilmaydi, faqat eski yozuvlar sotuv bilan birga o'chishi uchun
     schedule = relationship(
         "PaymentSchedule",
         cascade="all, delete-orphan",

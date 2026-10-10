@@ -11,7 +11,6 @@ const NAV = [
     items: [
       { to: '/receipts', label: 'Xomashyo kirimi', icon: '📥' },
       { to: '/production', label: 'Ishlab chiqarish', icon: '🏭' },
-      { to: '/inventory', label: 'Ombor', icon: '📦' },
     ],
   },
   {
@@ -21,7 +20,13 @@ const NAV = [
       { to: '/debts', label: 'Qarzdorlik', icon: '💳' },
     ],
   },
-  { title: 'Moliya', items: [{ to: '/expenses', label: 'Xarajatlar', icon: '💸' }] },
+  {
+    title: 'Moliya',
+    items: [
+      { to: '/expenses', label: 'Xarajatlar', icon: '💸' },
+      { to: '/reports', label: 'Hisobotlar', icon: '📈' },
+    ],
+  },
   {
     title: "Ma'lumotnomalar",
     items: [

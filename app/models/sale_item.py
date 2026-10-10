@@ -22,9 +22,9 @@ class SaleItem(Base):
         nullable=False
     )
 
-    partner_id: Mapped[int] = mapped_column(
+    partner_id: Mapped[int | None] = mapped_column(
         ForeignKey("partners.id"),
-        nullable=False
+        nullable=True
     )
 
     quantity: Mapped[float] = mapped_column(
